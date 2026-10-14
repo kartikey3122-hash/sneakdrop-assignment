@@ -37,3 +37,10 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+node_modules/
+.env
+.env.*
+!.env.example
+sneakdrop.db
+sneakdrop.db-shm
+sneakdrop.db-wal

@@ -1,0 +1,29 @@
+{
+  "name": "sneakdrop-assignment",
+  "version": "1.0.0",
+  "description": "A small shoe brand is launching one limited sneaker. They only have 20 pairs. When the sale opens, thousands of people will click Buy at the same second.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test tests/drop.test.js tests/payflow.test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kartikey3122-hash/sneakdrop-assignment.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/kartikey3122-hash/sneakdrop-assignment/issues"
+  },
+  "homepage": "https://github.com/kartikey3122-hash/sneakdrop-assignment#readme",
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "express": "^5.3.0"
+  },
+  "devDependencies": {
+    "supertest": "^7.3.1"
+  }
+}
