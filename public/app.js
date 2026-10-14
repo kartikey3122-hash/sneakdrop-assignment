@@ -23,7 +23,9 @@ let paying = false;
 let joining = false;
 
 const $ = (id) => document.getElementById(id);
-const payButtons = () => Array.from(document.querySelectorAll("[data-pay]"));
+// Single customer-facing checkout button. It always uses the default ("normal")
+// fake-payment flow; duplicate/delayed/out-of-order replays remain available
+// internally via POST /api/pay {scenario} for automated tests.
 
 async function api(path, opts = {}) {
   const res = await fetch(path, {
@@ -99,10 +101,13 @@ async function refresh() {
 
   // ---- queue ----
   if (data.myQueue) {
-    $("queueBox").innerHTML = `Position <strong>#${data.myQueue.position}</strong> of ${data.myQueue.total}`;
-    setPill($("queuePill"), `IN LINE · #${data.myQueue.position}`, "active");
+    const ahead = data.myQueue.position - 1;
+    $("queueBox").innerHTML = data.myQueue.position === 1
+      ? `You're <strong>next</strong> — first in line of ${data.myQueue.total}.`
+      : `You're in the queue — <strong>#${data.myQueue.position}</strong> of ${data.myQueue.total} (${ahead} ahead).`;
+    setPill($("queuePill"), data.myQueue.position === 1 ? "YOU'RE NEXT" : `IN LINE · #${data.myQueue.position}`, "active");
   } else if (data.myReservation && data.waitingCount > 0) {
-    $("queueBox").textContent = "Allocated from the line — your hold has started.";
+    $("queueBox").textContent = "You're next — a pair freed up and your fresh 5-minute hold has started.";
     setPill($("queuePill"), "ALLOCATED", "active");
   } else {
     $("queueBox").textContent = "Not in line.";
@@ -117,18 +122,18 @@ async function refresh() {
     : `<li class="empty">No orders yet — completed purchases appear here.</li>`;
   $("ordersPill").textContent = `${orders.length} / 2`;
 
-  // ---- pending fake-payment reconciliation (the fix: success only on backend proof) ----
+  // ---- pending payment reconciliation (success only on backend proof) ----
   if (pendingPayment) {
     const done = orders.find((o) => o.reservation_id === pendingPayment.reservationId);
     if (done) {
-      setFeedback($("payMsg"), `Payment confirmed — order ${done.id} · pair secured. No real money moved (simulation).`, "ok");
+      setFeedback($("payMsg"), `Booking confirmed — order ${done.id} · your pair is secured.`, "ok");
       pendingPayment = null;
     } else if (!data.myReservation) {
-      setFeedback($("payMsg"), `Payment did not complete — the hold expired or was rejected before the callback arrived. No order created; no charge (simulation).`, "err");
+      setFeedback($("payMsg"), `Reservation expired — no order created and nothing was charged. Try again while stock lasts.`, "err");
       pendingPayment = null;
     } else {
       const waited = Math.round((Date.now() - pendingPayment.startedAt) / 1000);
-      setFeedback($("payMsg"), `Waiting on the fake provider (${pendingPayment.scenario})… ${waited}s. Do not close — success shows only after backend confirmation.`, "info");
+      setFeedback($("payMsg"), `Processing payment… ${waited}s. Stay here — confirmation appears automatically.`, "info");
     }
   }
 
@@ -160,11 +165,10 @@ async function refresh() {
     $("buyHint").textContent = "";
   }
 
-  const canPay = !!data.myReservation && !pendingPayment && !paying;
-  for (const b of payButtons()) {
-    b.disabled = !canPay;
-    b.classList.toggle("busy", paying);
-  }
+  const payBtn = $("payBtn");
+  payBtn.disabled = !data.myReservation || !!pendingPayment || paying;
+  payBtn.classList.toggle("busy", paying || !!pendingPayment);
+  payBtn.textContent = paying || pendingPayment ? "Processing…" : "Pay Now";
 
   $("joinBtn").disabled = joining || !!data.myQueue || !!data.myReservation || atLimit;
   $("leaveBtn").disabled = !data.myQueue;
@@ -225,36 +229,33 @@ $("newUser").onclick = () => {
   refresh();
 };
 
-for (const btn of payButtons()) {
-  btn.onclick = async () => {
-    if (paying || pendingPayment) return; // prevent repeated clicks -> duplicate intents
-    if (!lastReservation) {
-      setFeedback($("payMsg"), "No active hold to pay for — click BUY NOW first.", "err");
-      return;
+$("payBtn").onclick = async () => {
+  if (paying || pendingPayment) return; // prevent repeated clicks -> duplicate intents
+  if (!lastReservation) {
+    setFeedback($("payMsg"), "No active hold to pay for — click BUY NOW first.", "err");
+    return;
+  }
+  paying = true;
+  setFeedback($("payMsg"), "Processing payment…", "info");
+  refresh();
+  const reservationId = lastReservation.id;
+  try {
+    const { ok, data } = await api("/api/pay", {
+      method: "POST",
+      body: JSON.stringify({ userId, reservationId }), // default normal flow; no scenario exposed
+    });
+    if (ok) {
+      pendingPayment = { paymentId: data.paymentId, reservationId, startedAt: Date.now() };
+      setFeedback($("payMsg"), "Processing payment… confirmation appears automatically.", "info");
+    } else {
+      setFeedback($("payMsg"), `Payment failed: ${data.error}`, "err");
     }
-    paying = true;
-    refresh();
-    const scenario = btn.getAttribute("data-pay");
-    const delayMs = scenario === "delayed" ? 8000 : undefined;
-    const reservationId = lastReservation.id;
-    try {
-      const { ok, data } = await api("/api/pay", {
-        method: "POST",
-        body: JSON.stringify({ userId, reservationId, scenario, delayMs }),
-      });
-      if (ok) {
-        pendingPayment = { paymentId: data.paymentId, reservationId, scenario, startedAt: Date.now() };
-        setFeedback($("payMsg"), `Waiting on the fake provider (${scenario})… 0s. Do not close — success shows only after backend confirmation.`, "info");
-      } else {
-        setFeedback($("payMsg"), `Payment rejected: ${data.error}`, "err");
-      }
-    } catch {
-      setFeedback($("payMsg"), "Network error — hold still active, safe to retry.", "err");
-    }
-    paying = false;
-    refresh();
-  };
-}
+  } catch {
+    setFeedback($("payMsg"), "Network error — hold still active, safe to retry.", "err");
+  }
+  paying = false;
+  refresh();
+};
 
 refresh();
 setInterval(refresh, 2000);

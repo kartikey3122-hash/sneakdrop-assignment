@@ -19,8 +19,8 @@ npm test
 # runs: node --test tests/drop.test.js tests/payflow.test.js
 ```
 
-Expected: 13 tests, 13 pass, 0 fail (verified 2026-10-14 on Node v25.9.0;
-`drop.test.js` 8/8, `payflow.test.js` 5/5). Tests use isolated temp
+Expected: 14 tests, 14 pass, 0 fail
+(`drop.test.js` 8/8, `payflow.test.js` 6/6). Tests use isolated temp
 databases only — the live `sneakdrop.db` is never touched by the suite.
 
 | Env var | Default | Use |
@@ -29,8 +29,28 @@ databases only — the live `sneakdrop.db` is never touched by the suite.
 | `DB_PATH` | `./sneakdrop.db` | Point at a different SQLite file |
 | `RESERVATION_TTL_MS` | `300000` | Hold length; tests override it for fast expiry |
 
-The SQLite file (`*.db*`) is git-ignored, so each fresh clone starts with exactly
-20 pairs. To wipe local data, stop the server and delete `sneakdrop.db*`.
+The SQLite file (`*.db*`, including auto-made `*.backup-*`) is git-ignored, so
+each fresh clone starts with exactly 20 pairs.
+
+## Resetting the local demo (reproducible starting state)
+
+Demo purchases (holds, orders, queue entries) persist in `sneakdrop.db`, so after
+clicking around the sale reads e.g. "2 sold / 18 available". To return to the
+original demo state — 20 total, 0 sold, 0 held, 20 available, empty queue —
+without touching the schema or app behavior:
+
+```bash
+npm run demo:reset
+# runs: node scripts/reset-demo.js --apply
+```
+
+What it does: checkpoints the WAL, copies `sneakdrop.db` to a timestamped
+`sneakdrop.db.backup-<ts>` file, then reuses the tested `resetDatabase()`
+helper (DELETEs transactional rows only — tables, indexes and constraints are
+preserved) and verifies the result is 20/0/0/20 with an empty queue. It works
+while the server is running; the next page poll shows the clean state.
+Dry-run first with `node scripts/reset-demo.js` (prints state, deletes nothing).
+To undo, stop the app and copy the backup back over `sneakdrop.db`.
 
 ## Requirements checklist (all covered)
 
@@ -46,7 +66,7 @@ The SQLite file (`*.db*`) is git-ignored, so each fresh clone starts with exactl
 - Payment-vs-expiry race safe — single transaction re-checks deadline; one winner.
 - One page: stock, hold, countdown, queue — `public/index.html`.
 - SQLite persistence — inventory, reservations, orders, queue, payments tables.
-- Automated tests — `tests/drop.test.js` (concurrency, expiry, FIFO, limits, duplicate/out-of-order, race) + `tests/payflow.test.js` (end-to-end `/api/pay` → timer → status for normal/duplicate/out-of-order/double-click/two-purchase history).
+- Automated tests — `tests/drop.test.js` (concurrency, expiry, FIFO, limits, duplicate/out-of-order, race) + `tests/payflow.test.js` (end-to-end `/api/pay` → timer → status for default Pay Now flow, normal/duplicate/out-of-order/double-click/two-purchase history).
 - README + NOTES — this file + `README.md`.
 
 ## Key decisions (plain language)
@@ -67,10 +87,13 @@ The SQLite file (`*.db*`) is git-ignored, so each fresh clone starts with exactl
 5. **Queue fairness with a guard.** If a line exists, new buyers queue behind it
    even if stock momentarily looks free. Ineligible waiters (2 already bought,
    or currently holding) are marked `skipped` so they never jam the line.
-6. **Fake PSP clearly labelled.** Every response says `simulated: true` / "FAKE
-   payment"; the frontend section is titled "Fake checkout (simulation)".
-   Scenarios: normal, duplicate (same id twice), out_of_order (newer seq first),
-   delayed/late (configurable delay).
+6. **Fake PSP clearly labelled.** Every response says `simulated: true`; the
+   checkout panel carries a "SIMULATION · NO REAL MONEY" pill. The customer UI
+   shows a single **Pay Now** button using the default flow — duplicate /
+   out_of_order / delayed / late scenarios stay available internally via
+   `POST /api/pay {scenario}` (and `/api/webhooks/payment`) for automated
+   tests only. Scenarios: normal (default), duplicate (same id twice),
+   out_of_order (newer seq first), delayed/late (configurable delay).
 7. **Fast tests, slow production.** Hold length is one global (`TTL_MS`) the
    tests shrink to ~250–300 ms, so expiry/race tests run in under a second
    while production stays at 5 minutes.
@@ -91,19 +114,29 @@ The SQLite file (`*.db*`) is git-ignored, so each fresh clone starts with exactl
 `payflow.test.js` (end-to-end user flow via `POST /api/pay` timers, the previously
 untested path behind the "stuck on Webhook arriving soon" report):
 
-9. Pay normal → exactly one order visible in `/api/status`.
-10. Pay duplicate scenario → still one order after the replay lands.
-11. Pay out-of-order scenario → still one order after the stale replay lands.
-12. Double-clicked Pay (two intents) → one winner, one deduped.
-13. Two Buy+Pay purchases → two distinct order IDs (history, not duplicates).
+9. Pay Now with no scenario (exactly what the UI sends) → default normal flow, one order.
+10. Pay normal → exactly one order visible in `/api/status`.
+11. Pay duplicate scenario → still one order after the replay lands.
+12. Pay out-of-order scenario → still one order after the stale replay lands.
+13. Double-clicked Pay (two intents) → one winner, one deduped.
+14. Two Buy+Pay purchases → two distinct order IDs (history, not duplicates).
 
 ## Frontend redesign notes
 
 - Premium dark theme lives entirely in `public/` (backend + schema untouched):
   graphite background, warm-white text, electric-lime accent, editorial headline,
   live stat grid + segmented stock bar, `m:ss` countdown with sub-60s pulse,
-  simulation-labelled checkout, FIFO queue panel, orders with PAID badges.
-- No external imagery, fonts, or JS frameworks — the hero shoe is an inline SVG,
+  simulation-labelled single-button checkout ("Pay Now", states: Processing
+payment / Booking confirmed / Reservation expired), FIFO queue panel with
+position + ahead count ("You're in the queue", "You're next"), orders with
+PAID badges.
+- Hero photography: `public/images/drop-001.jpg` (local file, ~100 KB, served by
+  Express static — zero external requests, so it can never break via a dead
+  image URL). Source: Unsplash photo 1552346154 (free to use under the Unsplash
+  license), downloaded once at build time; shown as placeholder campaign
+  photography for the fictional Drop 001. To swap it, replace that one file
+  (3:2 landscape works best with the existing `.shoe-photo` frame).
+- No external fonts or JS frameworks — system type only,
   so there are no external asset dependencies to document beyond "none".
 - UI state always follows the backend: every figure comes from `/api/status`,
   success renders only on backend-confirmed orders, and buttons disable while a

@@ -22,8 +22,10 @@ obj/
 
 # Databases and local data
 *.db
+*.db-*
 *.sqlite
 *.sqlite3
+*.backup-*
 
 # Logs
 *.log

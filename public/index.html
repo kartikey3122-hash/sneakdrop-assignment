@@ -43,38 +43,10 @@
       </div>
       <p class="hero-meta">You may hold <strong>1 pair</strong> at a time and own a maximum of <strong>2 pairs</strong> · <span>Bought: <strong id="bought">0</strong>/2</span></p>
     </div>
-    <div class="hero-stage" aria-hidden="true">
-      <div class="stage-ring"></div>
-      <svg class="shoe" viewBox="0 0 560 340" role="img" aria-label="Drop 001 sneaker illustration">
-        <defs>
-          <linearGradient id="soleGrad" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0" stop-color="#CDFF4D"/>
-            <stop offset="1" stop-color="#7AE000"/>
-          </linearGradient>
-        </defs>
-        <ellipse cx="280" cy="292" rx="220" ry="22" fill="#000" opacity="0.55"/>
-        <!-- upper -->
-        <path d="M60 250 C90 200 150 185 210 175 L300 160 C340 120 380 95 430 90 C455 88 470 100 465 120 L445 190 C430 230 380 248 300 254 L110 262 C85 263 55 262 60 250 Z"
-              fill="#1B1B20" stroke="#3A3A42" stroke-width="3"/>
-        <!-- collar + heel -->
-        <path d="M300 160 C340 120 380 95 430 90 C455 88 470 100 465 120 L455 155 C420 140 360 140 315 165 Z"
-              fill="#26262C" stroke="#3A3A42" stroke-width="2"/>
-        <!-- accent stripe -->
-        <path d="M120 232 C220 222 330 205 425 165 L430 185 C335 225 225 242 125 250 Z"
-              fill="url(#soleGrad)" opacity="0.92"/>
-        <!-- laces -->
-        <g stroke="#CDFF4D" stroke-width="6" stroke-linecap="round">
-          <line x1="310" y1="160" x2="350" y2="150"/>
-          <line x1="330" y1="145" x2="370" y2="135"/>
-          <line x1="350" y1="130" x2="390" y2="120"/>
-          <line x1="372" y1="115" x2="410" y2="106"/>
-        </g>
-        <!-- sole -->
-        <path d="M45 258 L515 240 C525 240 530 248 528 256 L520 278 C518 286 510 290 500 290 L80 296 C60 296 40 280 45 258 Z"
-              fill="#101014" stroke="#CDFF4D" stroke-width="3"/>
-        <text x="70" y="130" fill="#CDFF4D" font-family="Arial, sans-serif" font-size="26" font-weight="800" letter-spacing="6">001</text>
-      </svg>
-      <p class="stage-caption">DROP 001 — inline illustration, no external imagery</p>
+    <div class="hero-stage">
+      <div class="stage-ring" aria-hidden="true"></div>
+      <img class="shoe-photo" src="images/drop-001.jpg" alt="Drop 001 sneaker — campaign photo" />
+      <p class="stage-caption">DROP 001 — campaign photography, stored locally</p>
     </div>
   </section>
 
@@ -123,14 +95,10 @@
         <h2 id="pay-h">Checkout</h2>
         <span class="pill sim-pill">SIMULATION · NO REAL MONEY</span>
       </div>
-      <p class="fineprint">Test controls for the fake payment provider. Each sends a
-        <em>“payment succeeded”</em> callback with different timing — duplicates, delays and
-        out-of-order delivery included, like the real world.</p>
-      <div class="pay-grid">
-        <button data-pay="normal" class="pay-btn primary" type="button">Pay · normal</button>
-        <button data-pay="duplicate" class="pay-btn" type="button">Pay · duplicate webhook</button>
-        <button data-pay="out_of_order" class="pay-btn" type="button">Pay · out-of-order</button>
-        <button data-pay="delayed" class="pay-btn" type="button">Pay · delayed 8s</button>
+      <p class="fineprint">Demo checkout — <strong>no real money moves</strong>. Paying books
+        your held pair once the (simulated) payment callback confirms.</p>
+      <div class="pay-grid single">
+        <button id="payBtn" class="pay-btn primary" type="button">Pay Now</button>
       </div>
       <p id="payMsg" class="feedback" aria-live="polite"></p>
     </section>

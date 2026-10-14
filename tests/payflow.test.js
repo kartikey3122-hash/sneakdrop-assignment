@@ -55,6 +55,23 @@ describe("Pay flow end-to-end (POST /api/pay -> simulated webhook -> status)", (
     dbModule.setReservationTtlMs(5 * 60 * 1000);
   });
 
+  test("Pay Now (no scenario, what the UI sends) books exactly one order", async () => {
+    const u = "payflow_default";
+    const buy = await api.post("/api/buy").send({ userId: u });
+    assert.ok(buy.body.reserved, "buy should reserve");
+
+    // The customer UI sends no scenario; the backend must default to normal.
+    const pay = await api.post("/api/pay").send({ userId: u, reservationId: buy.body.reservationId });
+    assert.strictEqual(pay.status, 200);
+    assert.strictEqual(pay.body.scenario, "normal");
+    assert.strictEqual(pay.body.webhooksScheduled, 1);
+
+    const s = await waitForStatus(u, (b) => b.purchasedCount === 1);
+    assert.strictEqual(s.myOrders.length, 1, "exactly one order per purchase");
+    assert.strictEqual(s.myOrders[0].reservation_id, buy.body.reservationId);
+    assert.strictEqual(s.myReservation, null, "hold clears after payment");
+  });
+
   test("Pay normal completes: one order appears in status (was stuck on 'started...')", async () => {
     const u = "payflow_normal";
     const buy = await api.post("/api/buy").send({ userId: u });
